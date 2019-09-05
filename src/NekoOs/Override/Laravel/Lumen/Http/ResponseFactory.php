@@ -14,21 +14,38 @@ use Symfony\Component\HttpFoundation\StreamedResponse;
 class ResponseFactory
 {
     use Macroable;
+
     /**
-     * @var string
+     * @var array
      */
-    private static $facade;
+    private static $facade = [];
 
     /**
      * @param string|Closure $concreted
+     * @param string|null    $abstract
      */
-    public static function use($concreted)
+    public static function use($concreted, string $abstract = null)
     {
-        if (is_subclass_of($concreted, Response::class) || $concreted instanceof Closure) {
-            static::$facade = $concreted;
+        if (is_a($abstract, JsonResponse::class)) {
+            $abstract = JsonResponse::class;
+        } elseif (is_a($abstract, StreamedResponse::class)) {
+            $abstract = StreamedResponse::class;
+        } elseif (is_a($abstract, BinaryFileResponse::class)) {
+            $abstract = BinaryFileResponse::class;
+        } elseif (is_a($abstract, Response::class)) {
+            $abstract = Response::class;
+        } elseif (is_subclass_of($concreted, JsonResponse::class)) {
+            $abstract = JsonResponse::class;
+        } elseif (is_subclass_of($concreted, StreamedResponse::class)) {
+            $abstract = StreamedResponse::class;
+        } elseif (is_subclass_of($concreted, BinaryFileResponse::class)) {
+            $abstract = BinaryFileResponse::class;
+        } elseif (is_subclass_of($concreted, Response::class)) {
+            $abstract = Response::class;
         } else {
-            throw new Error('Argument not is a instance of Illuminate\Http\Response or a Closure');
+            throw new Error('Facade defined is not valid instance of Illuminate\Http\Response');
         }
+        static::$facade[$abstract] = $concreted;
     }
 
     /**
@@ -43,7 +60,7 @@ class ResponseFactory
      */
     public function download($file, $name = null, array $headers = [], $disposition = 'attachment')
     {
-        $response = new BinaryFileResponse($file, 200, $headers, true, $disposition);
+        $response = $this->create(BinaryFileResponse::class, $file, 200, $headers, true, $disposition);
 
         if (!is_null($name)) {
             return $response->setContentDisposition($disposition, $name, str_replace('%', '', Str::ascii($name)));
@@ -59,18 +76,17 @@ class ResponseFactory
      * @param int    $status
      * @param array  $headers
      *
-     * @return \Illuminate\Http\Response
+     * @return \Illuminate\Http\Response|\NekoOs\Override\Laravel\Lumen\Http\ResponseFactory
      */
     public function make($content = '', $status = 200, array $headers = [])
     {
-
         /** @var ResponseFactory $factory */
         $factory = app(\Laravel\Lumen\Http\ResponseFactory::class);
 
-        if (!($factory instanceof Response)) {
-            return new Response($content, $status, $headers);
-        } elseif (func_num_args() === 0) {
+        if (func_num_args() === 0) {
             return $factory;
+        } elseif (get_class($factory) == static::class) {
+            return $this->create(Response::class, $content, $status, $headers);
         }
         return $factory->make($content, $status, $headers);
     }
@@ -87,7 +103,7 @@ class ResponseFactory
      */
     public function json($data = [], $status = 200, array $headers = [], $options = 0)
     {
-        return new JsonResponse($data, $status, $headers, $options);
+        return $this->create(JsonResponse::class, $data, $status, $headers, $options);
     }
 
     /**
@@ -101,6 +117,23 @@ class ResponseFactory
      */
     public function stream($callback, $status = 200, array $headers = [])
     {
-        return new StreamedResponse($callback, $status, $headers);
+        return $this->create(StreamedResponse::class, $callback, $status, $headers);
+    }
+
+    /**
+     * Create a new defined instance
+     *
+     * @param string|Closure $abstract
+     * @param mixed          ...$arguments
+     *
+     * @return mixed
+     */
+    private function create($abstract, ...$arguments)
+    {
+        $response = static::$facade[$abstract] ?: $abstract;
+        if ($response instanceof Closure) {
+            return $response(...$arguments);
+        }
+        return new $response(...$arguments);
     }
 }
