@@ -14,8 +14,9 @@ use Symfony\Component\HttpFoundation\StreamedResponse;
 class ResponseFactory
 {
     use Macroable;
+
     /**
-     * @var string
+     * @var array
      */
     private static $facade = [];
 
@@ -59,8 +60,7 @@ class ResponseFactory
      */
     public function download($file, $name = null, array $headers = [], $disposition = 'attachment')
     {
-        $class = static::$facade[BinaryFileResponse::class] ?: BinaryFileResponse::class;
-        $response = new $class($file, 200, $headers, true, $disposition);
+        $response = $this->create(BinaryFileResponse::class, $file, 200, $headers, true, $disposition);
 
         if (!is_null($name)) {
             return $response->setContentDisposition($disposition, $name, str_replace('%', '', Str::ascii($name)));
@@ -86,8 +86,7 @@ class ResponseFactory
         if (func_num_args() === 0) {
             return $factory;
         } elseif (get_class($factory) == static::class) {
-            $response = static::$facade[Response::class] ?: Response::class;
-            return new $response($content, $status, $headers);
+            return $this->create(Response::class, $content, $status, $headers);
         }
         return $factory->make($content, $status, $headers);
     }
@@ -104,8 +103,7 @@ class ResponseFactory
      */
     public function json($data = [], $status = 200, array $headers = [], $options = 0)
     {
-        $response = static::$facade[JsonResponse::class] ?: JsonResponse::class;
-        return new $response($data, $status, $headers, $options);
+        return $this->create(JsonResponse::class, $data, $status, $headers, $options);
     }
 
     /**
@@ -119,7 +117,23 @@ class ResponseFactory
      */
     public function stream($callback, $status = 200, array $headers = [])
     {
-        $response = static::$facade[StreamedResponse::class] ?: StreamedResponse::class;
-        return new $response($callback, $status, $headers);
+        return $this->create(StreamedResponse::class, $callback, $status, $headers);
+    }
+
+    /**
+     * Create a new defined instance
+     *
+     * @param string|Closure $abstract
+     * @param mixed          ...$arguments
+     *
+     * @return mixed
+     */
+    private function create($abstract, ...$arguments)
+    {
+        $response = static::$facade[$abstract] ?: $abstract;
+        if ($response instanceof Closure) {
+            return $response(...$arguments);
+        }
+        return new $response(...$arguments);
     }
 }

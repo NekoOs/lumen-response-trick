@@ -17,5 +17,11 @@
     "psr-4": {
       "NekoOs\\": "src/NekoOs/"
     }
+  },
+  "require": {
+    "php" : "^7.0"
+  },
+  "require-dev": {
+    "laravel/lumen-framework": "*"
   }
 }
