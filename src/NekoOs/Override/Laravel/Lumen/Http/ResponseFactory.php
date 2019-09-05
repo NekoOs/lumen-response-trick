@@ -17,18 +17,34 @@ class ResponseFactory
     /**
      * @var string
      */
-    private static $facade;
+    private static $facade = [];
 
     /**
      * @param string|Closure $concreted
+     * @param string|null    $abstract
      */
-    public static function use($concreted)
+    public static function use($concreted, string $abstract = null)
     {
-        if (is_subclass_of($concreted, Response::class) || $concreted instanceof Closure) {
-            static::$facade = $concreted;
+        if (is_a($abstract, JsonResponse::class)) {
+            $abstract = JsonResponse::class;
+        } elseif (is_a($abstract, StreamedResponse::class)) {
+            $abstract = StreamedResponse::class;
+        } elseif (is_a($abstract, BinaryFileResponse::class)) {
+            $abstract = BinaryFileResponse::class;
+        } elseif (is_a($abstract, Response::class)) {
+            $abstract = Response::class;
+        } elseif (is_subclass_of($concreted, JsonResponse::class)) {
+            $abstract = JsonResponse::class;
+        } elseif (is_subclass_of($concreted, StreamedResponse::class)) {
+            $abstract = StreamedResponse::class;
+        } elseif (is_subclass_of($concreted, BinaryFileResponse::class)) {
+            $abstract = BinaryFileResponse::class;
+        } elseif (is_subclass_of($concreted, Response::class)) {
+            $abstract = Response::class;
         } else {
-            throw new Error('Argument not is a instance of Illuminate\Http\Response or a Closure');
+            throw new Error('Facade defined is not valid instance of Illuminate\Http\Response');
         }
+        static::$facade[$abstract] = $concreted;
     }
 
     /**
@@ -43,7 +59,8 @@ class ResponseFactory
      */
     public function download($file, $name = null, array $headers = [], $disposition = 'attachment')
     {
-        $response = new BinaryFileResponse($file, 200, $headers, true, $disposition);
+        $class = static::$facade[BinaryFileResponse::class] ?: BinaryFileResponse::class;
+        $response = new $class($file, 200, $headers, true, $disposition);
 
         if (!is_null($name)) {
             return $response->setContentDisposition($disposition, $name, str_replace('%', '', Str::ascii($name)));
@@ -59,18 +76,18 @@ class ResponseFactory
      * @param int    $status
      * @param array  $headers
      *
-     * @return \Illuminate\Http\Response
+     * @return \Illuminate\Http\Response|\NekoOs\Override\Laravel\Lumen\Http\ResponseFactory
      */
     public function make($content = '', $status = 200, array $headers = [])
     {
-
         /** @var ResponseFactory $factory */
         $factory = app(\Laravel\Lumen\Http\ResponseFactory::class);
 
-        if (!($factory instanceof Response)) {
-            return new Response($content, $status, $headers);
-        } elseif (func_num_args() === 0) {
+        if (func_num_args() === 0) {
             return $factory;
+        } elseif (get_class($factory) == static::class) {
+            $response = static::$facade[Response::class] ?: Response::class;
+            return new $response($content, $status, $headers);
         }
         return $factory->make($content, $status, $headers);
     }
@@ -87,7 +104,8 @@ class ResponseFactory
      */
     public function json($data = [], $status = 200, array $headers = [], $options = 0)
     {
-        return new JsonResponse($data, $status, $headers, $options);
+        $response = static::$facade[JsonResponse::class] ?: JsonResponse::class;
+        return new $response($data, $status, $headers, $options);
     }
 
     /**
@@ -101,6 +119,7 @@ class ResponseFactory
      */
     public function stream($callback, $status = 200, array $headers = [])
     {
-        return new StreamedResponse($callback, $status, $headers);
+        $response = static::$facade[StreamedResponse::class] ?: StreamedResponse::class;
+        return new $response($callback, $status, $headers);
     }
 }
