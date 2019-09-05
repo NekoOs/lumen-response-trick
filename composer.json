@@ -1,0 +1,21 @@
+{
+  "name": "nekoos/lumen-response-trick",
+  "description": "Replace the lumen response facade with configurable interface",
+  "version": "1.0.0",
+  "minimum-stability": "dev",
+  "license": "MIT",
+  "authors": [
+    {
+      "name": "Neder Alfonso Fandiño Andrade",
+      "email": "neafand@gmail.com"
+    }
+  ],
+  "autoload": {
+    "files": [
+      "src/NekoOs/Lumen/Trick/response-helpers.php"
+    ],
+    "psr-4": {
+      "NekoOs\\": "src/NekoOs/"
+    }
+  }
+}
